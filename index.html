@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3色サイコロゲーム</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            margin: 0;
+            background: #f0f0f0;
+        }
+        #title-screen, #game-container, #rules-screen {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 { font-size: 36px; color: #333; }
+        #title-screen button, #rules-screen button {
+            padding: 15px 30px;
+            font-size: 18px;
+            margin: 10px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background: #4CAF50;
+            color: white;
+        }
+        #title-screen button:hover, #rules-screen button:hover { background: #45a049; }
+        #rules-screen { text-align: left; line-height: 1.6; }
+        #rules-screen ul { margin: 20px 0; padding-left: 20px; }
+        #game-container { display: none; }
+        .dice-container, .kept-dice-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .kept-dice-container {
+            border: 2px solid #ccc;
+            padding: 10px;
+            min-height: 60px;
+            background: #f9f9f9;
+        }
+        .dice {
+            width: 50px;
+            height: 50px;
+            margin: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .green { background: green; }
+        .yellow { background: yellow; color: black; }
+        .red { background: red; }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 5px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background: #008CBA;
+            color: white;
+        }
+        button:hover { background: #006d93; }
+        button:disabled { cursor: not-allowed; opacity: 0.5; background: #ccc; }
+        #status { margin-bottom: 20px; font-size: 18px; color: #333; }
+        #score-container { margin: 20px auto; text-align: left; max-width: 400px; font-size: 16px; }
+        #score-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        #score-table th, #score-table td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        #score-table th { background: #4CAF50; color: white; }
+        #total-score { font-size: 20px; font-weight: bold; margin-top: 10px; color: #d32f2f; }
+        @media (max-width: 600px) {
+            .dice { width: 40px; height: 40px; font-size: 16px; }
+            button { padding: 8px 16px; font-size: 14px; }
+            h1 { font-size: 28px; }
+            #score-table th, #score-table td { font-size: 14px; padding: 6px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="title-screen">
+        <h1>3色サイコロゲーム</h1>
+        <button onclick="startGame()">スタート</button>
+        <button onclick="showRules()">遊び方</button>
+    </div>
+    <div id="rules-screen" style="display: none;">
+        <h1>3色サイコロゲームのルール</h1>
+        <p>5ラウンドで10個のサイコロ、緑（6分の3）、黄（6分の2）、赤（6分の1）を使い、高スコアを目指す。</p>
+        <ul>
+            <li><b>目的</b>: 緑のサイコロを多く集め、スコアを稼ぐ。</li>
+            <li><b>サイコロを振る</b>: 各ラウンドで10個振り、緑は自動キープ。</li>
+            <li><b>全て緑</b>: 10個全て緑で10点獲得、サイコロリセット。</li>
+            <li><b>アウト</b>: 赤が出て緑が0なら0点でラウンド終了。</li>
+            <li><b>セーフ</b>: 赤が出ても緑があれば続行。緑をキープし振り直しか次のラウンドへ、次へ行くとその時点でのスコアが獲得できる。</li>
+            <li><b>黄色のみ</b>: 緑も赤も出ず黄色だけなら振り直し必須。</li>
+            <li><b>ラウンド終了</b>: 「次へ」かアウトで終了。スコアは緑ボーナス＋緑の数（1個1点）。</li>
+            <li><b>ゲーム終了</b>: 5ラウンド後、トータルスコアで結果決定。</li>
+        </ul>
+        <button onclick="showTitle()">タイトルに戻る</button>
+    </div>
+    <div id="game-container">
+        <h1>3色サイコロゲーム</h1>
+        <div id="status">ラウンド 1 開始！</div>
+        <div class="kept-dice-container" id="kept-dice-container"></div>
+        <div class="dice-container" id="dice-container"></div>
+        <div>
+            <button id="roll-button">サイコロを振る</button>
+            <button id="next-round-button" disabled>次のラウンドへ</button>
+        </div>
+        <div id="score-container">
+            <div>各ラウンドのスコア:</div>
+            <table id="score-table">
+                <thead>
+                    <tr>
+                        <th>ラウンド</th>
+                        <th>緑ボーナス</th>
+                        <th>緑の数</th>
+                        <th>合計</th>
+                    </tr>
+                </thead>
+                <tbody id="score-table-body"></tbody>
+            </table>
+            <div id="total-score">現在のトータルスコア: -点</div>
+        </div>
+    </div>
+
+    <script>
+        const NUM_DICE = 10, NUM_ROUNDS = 5, SIDES = ['green', 'green', 'green', 'yellow', 'yellow', 'red'];
+        let currentRound = 1, totalScore = 0, roundScores = Array(NUM_ROUNDS).fill().map(() => ({ bonus: 0, greens: 0, total: 0 }));
+        let currentRoundScore = 0, allGreenCount = 0, dice = [], keptDice = [], isRolling = false, isRoundOver = false, allGreenPending = false;
+        let shouldDisplayDice = false;
+
+        const $ = id => document.getElementById(id);
+
+        function showScreen(screen) {
+            ['title-screen', 'rules-screen', 'game-container'].forEach(s => $(s).style.display = s === screen ? 'block' : 'none');
+        }
+
+        function showTitle() { showScreen('title-screen'); }
+        function showRules() { showScreen('rules-screen'); }
+
+        function startGame() {
+            showScreen('game-container');
+            initRound();
+            updateScoreDisplay();
+        }
+
+        function initRound() {
+            dice = [];
+            keptDice = [];
+            currentRoundScore = 0;
+            allGreenCount = 0;
+            isRoundOver = false;
+            allGreenPending = false;
+            shouldDisplayDice = false;
+            $('status').textContent = `ラウンド ${currentRound} 開始！`;
+            $('roll-button').disabled = false;
+            $('roll-button').textContent = 'サイコロを振る';
+            $('next-round-button').disabled = true;
+            updateDiceDisplay();
+        }
+
+        function rollDice() {
+            if (isRolling || isRoundOver) return;
+
+            isRolling = true;
+            $('roll-button').disabled = true;
+
+            if (allGreenPending) {
+                dice = [];
+                keptDice = [];
+                allGreenPending = false;
+                shouldDisplayDice = false;
+                $('roll-button').textContent = 'サイコロを振る';
+                $('next-round-button').disabled = true;
+                updateDiceDisplay();
+                $('status').textContent = `ラウンド ${currentRound}: サイコロをリセットしました。続けて振ってください！`;
+                isRolling = false;
+                $('roll-button').disabled = false;
+                return;
+            }
+
+            dice = Array(NUM_DICE - keptDice.length).fill().map(() => SIDES[Math.floor(Math.random() * SIDES.length)]);
+            shouldDisplayDice = true;
+            updateDiceDisplay();
+            checkRollResult();
+
+            setTimeout(() => {
+                if (!isRoundOver && !allGreenPending) moveGreenToKept();
+                isRolling = false;
+                $('roll-button').disabled = isRoundOver;
+                if (allGreenPending) {
+                    $('roll-button').textContent = 'もう一度振る';
+                    $('roll-button').disabled = false;
+                }
+            }, 1000);
+        }
+
+        function moveGreenToKept() {
+            keptDice = keptDice.concat(dice.filter(s => s === 'green'));
+            dice = dice.filter(s => s !== 'green');
+            updateDiceDisplay();
+        }
+
+        function updateDiceDisplay() {
+            const kept = $('kept-dice-container'), cont = $('dice-container');
+            kept.innerHTML = cont.innerHTML = '';
+
+            if (allGreenPending) {
+                const scoreElem = document.createElement('div');
+                scoreElem.style.cssText = 'font-size: 24px; color: #d32f2f; padding: 10px;';
+                scoreElem.textContent = `現在のラウンドのスコア: ${currentRoundScore}点`;
+                kept.appendChild(scoreElem);
+            } else if (shouldDisplayDice) {
+                keptDice.forEach(side => appendDice(kept, side));
+                dice.forEach(side => appendDice(cont, side));
+            }
+        }
+
+        function appendDice(container, side) {
+            const el = document.createElement('div');
+            el.className = `dice ${side}`;
+            el.textContent = side.charAt(0).toUpperCase();
+            container.appendChild(el);
+        }
+
+        function checkRollResult() {
+            const greens = dice.filter(s => s === 'green').length;
+            const yellows = dice.filter(s => s === 'yellow').length;
+            const reds = dice.filter(s => s === 'red').length;
+
+            if (greens + keptDice.length === NUM_DICE) {
+                allGreenCount++;
+                currentRoundScore += 10;
+                keptDice = dice.slice();
+                dice = [];
+                allGreenPending = true;
+                updateDiceDisplay();
+                $('status').textContent = `ラウンド ${currentRound}: 全て緑！10点獲得！「もう一度振る」を押してください。`;
+                $('next-round-button').disabled = true;
+                updateScoreDisplay();
+                return;
+            }
+
+            if (reds > 0 && greens === 0) {
+                currentRoundScore = 0;
+                roundScores[currentRound - 1] = { bonus: 0, greens: 0, total: 0 };
+                $('status').textContent = `ラウンド ${currentRound}: 赤が出て緑が0。アウト！スコア: 0点`;
+                isRoundOver = true;
+                $('roll-button').disabled = true;
+                $('next-round-button').disabled = false;
+                updateScoreDisplay();
+                return;
+            }
+
+            if (reds > 0 && greens > 0) {
+                $('status').textContent = `ラウンド ${currentRound}: 赤が出ましたが緑が${greens}個でセーフ！続けるか次へ。`;
+                $('next-round-button').disabled = false;
+                return;
+            }
+
+            if (yellows > 0 && greens === 0 && reds === 0) {
+                $('status').textContent = `ラウンド ${currentRound}: 黄色のみ。振り直してください。`;
+                $('next-round-button').disabled = true;
+                return;
+            }
+
+            $('status').textContent = `ラウンド ${currentRound}: 緑が${greens}個。続けるか次へ。`;
+            $('next-round-button').disabled = false;
+        }
+
+        function nextRound() {
+            if (!isRoundOver) {
+                const greens = keptDice.length;
+                const total = currentRoundScore + greens;
+                roundScores[currentRound - 1] = { bonus: currentRoundScore, greens, total };
+            }
+            currentRound++;
+            updateScoreDisplay();
+            if (currentRound > NUM_ROUNDS) {
+                totalScore = roundScores.reduce((sum, s) => sum + (s.total || 0), 0);
+                $('status').textContent = `ゲーム終了！`;
+                $('roll-button').disabled = true;
+                $('next-round-button').disabled = true;
+                $('total-score').textContent = `最終トータルスコア: ${totalScore}点`;
+            } else {
+                initRound();
+            }
+        }
+
+        function updateScoreDisplay() {
+            $('score-table-body').innerHTML = roundScores.map((s, i) => `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td>${s.bonus || '-'}</td>
+                    <td>${s.greens || '-'}</td>
+                    <td>${s.total || '-'}</td>
+                </tr>
+            `).join('');
+            $('total-score').textContent = currentRound > NUM_ROUNDS ? `最終トータルスコア: ${totalScore}点` : `現在のトータルスコア: -点`;
+        }
+
+        $('roll-button').addEventListener('click', rollDice);
+        $('next-round-button').addEventListener('click', nextRound);
+        showTitle();
+    </script>
+</body>
+</html>
